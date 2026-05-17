@@ -519,8 +519,10 @@ def tick_all() -> dict[str, bool]:
 
     return {"ok": True}
 
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 import io
+from pathlib import Path
 
 @app.get("/api/postes/{poste_id}/export")
 def export_history(poste_id: str, start: str, end: str):
@@ -688,3 +690,15 @@ def poste_detail(poste_id: str) -> dict[str, Any]:
         "history": history,
         "shiftHistory": shift_history,
     }
+
+# Serve frontend static files
+frontend_dist = Path("frontend/dist")
+if frontend_dist.exists():
+    app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
+
+    @app.get("/{path:path}", response_class=HTMLResponse)
+    async def serve_frontend(path: str):
+        index_path = frontend_dist / "index.html"
+        if index_path.exists():
+            return index_path.read_text()
+        return "<html><body><h1>404 Not Found</h1></body></html>"
