@@ -1,21 +1,54 @@
 from __future__ import annotations
-
+import resend
 from dataclasses import dataclass, field
 from datetime import datetime, date, time
 from typing import Any
+import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from uuid import uuid4
 
 import pandas as pd
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from pydantic import BaseModel
-import os
-import smtplib
-import json
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+
+ADMIN_EMAIL = "mohamedbensaleh000@gmail.com"
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
+
+resend.api_key = "re_KuQMetVa_JBFSbBWRGe3TnwJvKLCbTzFf"
+
+TEST_MODE = True  # Set to False once you verify a domain on resend.com
+RESEND_TEST_EMAIL = "ostarostar12@gmail.com"  # Your verified address
+
+def send_notification_emails(recipients: list[str], subject: str, body: str):
+    if not recipients:
+        return
+
+    if TEST_MODE:
+        # Resend only allows sending to your own email in test mode
+        to = [RESEND_TEST_EMAIL]
+        print(f"[TEST MODE] Would have sent to: {recipients} — sending only to {RESEND_TEST_EMAIL}")
+    else:
+        to = recipients
+
+    try:
+        r = resend.Emails.send({
+            "from": "Maintenance System <onboarding@resend.dev>",
+            "to": to,
+            "subject": subject,
+            "html": body
+        })
+        print(f"Email sent: {r}")
+    except Exception as e:
+        print(f"[EMAIL ERROR] Failed to send: {e}")
+        # Don't crash the tick — just log it
+
+def send_admin_email(subject: str, body: str):
+    send_notification_emails([ADMIN_EMAIL], subject, body)
 
 
 def process_excel_data(file_obj: Any) -> pd.DataFrame:
@@ -168,7 +201,7 @@ class Alert(BaseModel):
     start_time: datetime
     status: str  # "pending", "claimed", "fixed"
     claimed_by: str | None = None
-
+    email_sent: bool = False  # ← add this
 
 class MaintenanceAction(BaseModel):
     alert_id: str
@@ -177,64 +210,15 @@ class MaintenanceAction(BaseModel):
 
 class Store:
     postes: dict[str, Poste] = field(default_factory=dict)
-    users: dict[str, str] = field(default_factory=dict)  # email -> password
+    users: dict[str, dict] = field(default_factory=dict)  # email -> {"password": str, "role": str}
     alerts: dict[str, Alert] = field(default_factory=dict)
-    USERS_FILE = "users_data.json"
+    logged_in_users: set[str] = field(default_factory=set)
 
     def __init__(self) -> None:
         self.postes = {}
         self.users = {}
         self.alerts = {}
-        self.load_users()
-
-    def save_users(self):
-        try:
-            with open(self.USERS_FILE, "w") as f:
-                json.dump(self.users, f)
-        except Exception as e:
-            print(f"STORE ERROR: Could not save users - {e}")
-
-    def load_users(self):
-        if os.path.exists(self.USERS_FILE):
-            try:
-                with open(self.USERS_FILE, "r") as f:
-                    self.users = json.load(f)
-                print(f"STORE: Loaded {len(self.users)} users from disk.")
-            except Exception as e:
-                print(f"STORE ERROR: Could not load users - {e}")
-
-
-def send_email_notification(poste_name: str, error_text: str, duration: float, receiver_emails: list[str]):
-    sender_email = os.getenv("SENDER_EMAIL")
-    sender_password = os.getenv("SENDER_PASSWORD")
-    
-    if not all([sender_email, sender_password]) or not receiver_emails:
-        print(f"EMAIL LOG: Skipping email (credentials not set or no recipients). Recipients count: {len(receiver_emails)}")
-        return
-
-    subject = f"ALERTE TECHNIQUE : {poste_name}"
-    body = f"""
-    Une défaillance technique a été détectée sur la machine : {poste_name}
-    
-    Détail de l'erreur : {error_text}
-    Durée de l'erreur : {duration:.1f} minutes (temps simulé)
-    
-    Veuillez intervenir rapidement sur le tableau de bord de maintenance.
-    """
-
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(sender_email, sender_password)
-            for receiver in receiver_emails:
-                msg = MIMEMultipart()
-                msg['From'] = sender_email
-                msg['To'] = receiver
-                msg['Subject'] = subject
-                msg.attach(MIMEText(body, 'plain'))
-                server.send_message(msg)
-        print(f"EMAIL LOG: Success - Alert emails sent to {len(receiver_emails)} users.")
-    except Exception as e:
-        print(f"EMAIL LOG: Failed to send emails - {str(e)}")
+        self.logged_in_users = set()
 
 
 store = Store()
@@ -266,23 +250,29 @@ def list_postes() -> list[dict[str, Any]]:
 def register(user: User):
     if user.email in store.users:
         raise HTTPException(status_code=400, detail="User already exists")
-    store.users[user.email] = user.password
-    store.save_users()
-    return {"email": user.email, "token": "mock-token-" + str(uuid4())}
-
-
-@app.post("/api/auth/test-email")
-def test_email(user: User):
-    # This endpoint allows a logged-in user to test if the email system works for them
-    send_email_notification("TEST SYSTEM", "Ceci est un email de test pour vérifier votre configuration.", 0, [user.email])
-    return {"message": f"Email de test envoyé à {user.email}"}
+    role = "admin" if user.email.lower() == ADMIN_EMAIL.lower() else "user"
+    store.users[user.email] = {"password": user.password, "role": role}
+    return {"email": user.email, "token": "mock-token-" + str(uuid4()), "role": role}
 
 
 @app.post("/api/auth/login")
 def login(user: User):
-    if store.users.get(user.email) != user.password:
+    user_data = store.users.get(user.email)
+    if not user_data or user_data["password"] != user.password:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {"email": user.email, "token": "mock-token-" + str(uuid4())}
+    
+    # Mark user as logged in
+    store.logged_in_users.add(user.email)
+    
+    return {"email": user.email, "token": "mock-token-" + str(uuid4()), "role": user_data["role"]}
+
+
+@app.post("/api/auth/logout")
+def logout(payload: dict):
+    email = payload.get("email")
+    if email in store.logged_in_users:
+        store.logged_in_users.remove(email)
+    return {"ok": True}
 
 
 @app.post("/api/auth/forgot-password")
@@ -338,6 +328,11 @@ def fix_alert(action: MaintenanceAction):
 
 @app.post("/api/postes")
 def create_poste(name: str = Form(...), files: list[UploadFile] = File(...)) -> dict[str, Any]:
+    # Check if poste with same name already exists
+    existing_poste_id = next((p.id for p in store.postes.values() if p.name == name), None)
+    if existing_poste_id:
+        raise HTTPException(status_code=400, detail=f"Poste with name '{name}' already exists.")
+        
     data = process_excel_files(files)
     start = data["Timestamp"].min()
     poste = Poste(
@@ -381,6 +376,12 @@ def append_to_poste(poste_id: str, files: list[UploadFile] = File(...)) -> dict[
 def delete_poste(poste_id: str) -> dict[str, bool]:
     _get_poste(poste_id)
     del store.postes[poste_id]
+    
+    # Remove any alerts associated with this poste
+    alerts_to_delete = [aid for aid, alert in store.alerts.items() if alert.poste_id == poste_id]
+    for aid in alerts_to_delete:
+        del store.alerts[aid]
+        
     return {"ok": True}
 
 
@@ -453,43 +454,70 @@ def jump_all(payload: JumpIn) -> dict[str, bool]:
 def tick_all() -> dict[str, bool]:
     for poste in store.postes.values():
         if not poste.is_paused and not poste.data.empty:
-            poste.current_sim_time += get_time_jump_delta(poste)
-            
-            # Check for errors and handle 3-minute alert logic
-            color, status, _, last_row, _ = compute_poste_status(poste)
-            if color == "red" and last_row:
-                error_start = pd.Timestamp(last_row["Timestamp"])
-                
-                # Ensure same timezone for subtraction
-                sim_time = poste.current_sim_time
-                if sim_time.tz is not None and error_start.tz is None:
-                    error_start = error_start.tz_localize(sim_time.tz)
-                elif sim_time.tz is None and error_start.tz is not None:
-                    error_start = error_start.tz_localize(None)
-                
-                duration_mins = (sim_time - error_start).total_seconds() / 60
-                
-                if duration_mins >= 0:
-                    # Check if an alert already exists for this error on this machine
-                    alert_exists = any(a.poste_id == poste.id and a.status != "fixed" for a in store.alerts.values())
-                    if not alert_exists:
-                        alert_id = str(uuid4())
-                        store.alerts[alert_id] = Alert(
-                            id=alert_id,
-                            poste_id=poste.id,
-                            poste_name=poste.name,
-                            error_text=last_row.get('Error-Text', 'Unknown error'),
-                            start_time=poste.current_sim_time,
-                            status="pending"
-                        )
-                        print(f"PROFESSIONAL MAIL: To Group Maintenance - Machine {poste.name} has a Technical failure: {last_row.get('Error-Text')}. Duration: {duration_mins:.1f} min.")
-                        # Send real email to all registered users
-                        all_users = list(store.users.keys())
-                        print(f"EMAIL DEBUG: Found {len(all_users)} registered users: {all_users}")
-                        send_email_notification(poste.name, last_row.get('Error-Text', 'Unknown error'), duration_mins, all_users)
-    
-    return {"ok": True}
+            delta = get_time_jump_delta(poste)
+            poste.current_sim_time += delta
 
+            color, status, df_sim, last_row, _ = compute_poste_status(poste)
+            if color == "red" and last_row and not df_sim.empty:
+                error_rows = []
+                for _, row in df_sim[::-1].iterrows():
+                    row_has_error = pd.notna(row.get("Error-Text")) and str(row.get("Error-Text")).strip() != ""
+                    if row_has_error:
+                        error_rows.append(row)
+                    else:
+                        break
+
+                if error_rows:
+                    first_error_row = error_rows[-1]
+                    error_start = pd.Timestamp(first_error_row["Timestamp"])
+
+                    sim_time = poste.current_sim_time
+                    if sim_time.tz is not None and error_start.tz is None:
+                        error_start = error_start.tz_localize(sim_time.tz)
+                    elif sim_time.tz is None and error_start.tz is not None:
+                        error_start = error_start.tz_localize(None)
+
+                    duration_mins = (sim_time - error_start).total_seconds() / 60
+
+                    if duration_mins >= 0:
+                        # --- Step 1: Create alert once if none is active ---
+                        active_alert = next(
+                            (a for a in store.alerts.values()
+                             if a.poste_id == poste.id and a.status != "fixed"),
+                            None
+                        )
+                        if not active_alert:
+                            alert_id = str(uuid4())
+                            store.alerts[alert_id] = Alert(
+                                id=alert_id,
+                                poste_id=poste.id,
+                                poste_name=poste.name,
+                                error_text=last_row.get('Error-Text', 'Unknown error'),
+                                start_time=poste.current_sim_time,
+                                status="pending",
+                                email_sent=False
+                            )
+                            active_alert = store.alerts[alert_id]
+
+                        # --- Step 2: Send email once per alert, independently ---
+                        if not active_alert.email_sent:
+                            print(f"PROFESSIONAL MAIL: To Group Maintenance - Machine {poste.name} has a Technical failure: {active_alert.error_text}. Duration: {duration_mins:.1f} min.")
+
+                            recipients = list(store.logged_in_users)
+                            if ADMIN_EMAIL not in recipients:
+                                recipients.append(ADMIN_EMAIL)
+
+                            subject = f"ALERTE MAINTENANCE: {poste.name}"
+                            body = (
+                                f"La machine {poste.name} a une défaillance technique.\n\n"
+                                f"Erreur: {active_alert.error_text}\n"
+                                f"Durée: {duration_mins:.1f} minutes\n\n"
+                                f"Ceci est une notification automatique envoyée à tout le personnel de maintenance connecté."
+                            )
+                            send_notification_emails(recipients, subject, body)
+                            active_alert.email_sent = True  # ← never sends again
+
+    return {"ok": True}
 
 from fastapi.responses import FileResponse, StreamingResponse
 import io
@@ -660,14 +688,3 @@ def poste_detail(poste_id: str) -> dict[str, Any]:
         "history": history,
         "shiftHistory": shift_history,
     }
-
-
-# Serve static files from the 'frontend/dist' directory
-if os.path.exists("frontend/dist"):
-    app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="frontend")
-
-@app.get("/{full_path:path}")
-async def serve_react_app(full_path: str):
-    if os.path.exists("frontend/dist/index.html"):
-        return FileResponse("frontend/dist/index.html")
-    return {"detail": "Frontend not found. Make sure to run 'npm run build' in the frontend directory."}
