@@ -2,6 +2,8 @@
 
 A unified monitoring system with a FastAPI backend and a React (Vite) frontend.
 
+**New?** Check out the [Simple Guide for Non-Programmers](README_FOR_NON_PROGRAMMERS.md)!
+
 ## Features
 - Real-time machine monitoring.
 - Production data analysis from Excel files.
