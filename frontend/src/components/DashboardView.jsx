@@ -38,6 +38,10 @@ export default function DashboardView({ detail, selected, onBack }) {
           <strong>{detail.totalShift}</strong>
           <small>PIÈCES</small>
         </div>
+        <div className={`shift-circle temp-${detail.temperatureColor}`}>
+          <div>TEMP</div>
+          <strong>{detail.temperature}</strong>
+        </div>
         <div className="meta-info">
           <div>Statut : <span>{detail.statusText}</span></div>
           <div>Temps simulé : <span>{new Date(detail.currentSimTime).toLocaleString()}</span></div>
@@ -96,10 +100,10 @@ export default function DashboardView({ detail, selected, onBack }) {
         </div>
       </div>
       <table>
-        <thead><tr><th>Date</th><th>Time</th><th>Splice</th><th>Error</th></tr></thead>
+        <thead><tr><th>Date</th><th>Time</th><th>Splice</th><th>Température</th><th>Error</th></tr></thead>
         <tbody>
           {detail.history.map((r, i) => (
-            <tr key={i}><td>{r.Date}</td><td>{r.Time}</td><td>{r.Splice}</td><td>{r["Error-Text"]}</td></tr>
+            <tr key={i}><td>{r.Date}</td><td>{r.Time}</td><td>{r.Splice}</td><td>{r.Temperature || "---"}</td><td>{r["Error-Text"]}</td></tr>
           ))}
         </tbody>
       </table>

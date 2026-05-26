@@ -94,6 +94,20 @@ def get_time_jump_delta(poste: "Poste") -> pd.Timedelta:
     return pd.Timedelta(hours=poste.time_jump_value)
 
 
+def get_temperature_status(temperature: float | None) -> tuple[str, str]:
+    if temperature is None:
+        return "gray", "---"
+    temp = float(temperature)
+    if temp <= 45:
+        return "green", f"{temp}°C"
+    elif 46 <= temp <= 60:
+        return "yellow", f"{temp}°C"
+    elif 61 <= temp <= 70:
+        return "orange", f"{temp}°C"
+    else:  # above 71
+        return "red", f"{temp}°C"
+
+
 def compute_poste_status(poste: "Poste") -> tuple[str, str, pd.DataFrame, dict[str, Any] | None, pd.Timestamp]:
     color = "green"
     status = "Machine en Production"
@@ -632,8 +646,13 @@ def poste_detail(poste_id: str) -> dict[str, Any]:
         breakdown = counts.to_dict("records")
     else:
         breakdown = []
+    
+    # Get temperature from last row
+    temperature = last_row.get("Temperature") if last_row else None
+    temp_color, temp_text = get_temperature_status(temperature)
+    
     history = (
-        df_sim[["Date", "Time", "Splice", "Error-Text"]].tail(10).fillna("").to_dict("records")
+        df_sim[["Date", "Time", "Splice", "Error-Text", "Temperature"]].tail(10).fillna("").to_dict("records")
         if not df_sim.empty
         else []
     )
@@ -689,6 +708,8 @@ def poste_detail(poste_id: str) -> dict[str, Any]:
         "breakdown": breakdown,
         "history": history,
         "shiftHistory": shift_history,
+        "temperature": temp_text,
+        "temperatureColor": temp_color,
     }
 
 # Serve frontend static files

@@ -964,3 +964,34 @@ td {
 .test-email-btn:active {
   transform: translateY(0);
 }
+
+/* Temperature colors */
+.temp-green {
+  border-color: #16a34a !important;
+  background: linear-gradient(135deg, #dcfce7, #16a34a);
+  color: white;
+}
+
+.temp-yellow {
+  border-color: #ca8a04 !important;
+  background: linear-gradient(135deg, #fef9c3, #ca8a04);
+  color: #111827;
+}
+
+.temp-orange {
+  border-color: #ea580c !important;
+  background: linear-gradient(135deg, #ffedd5, #ea580c);
+  color: white;
+}
+
+.temp-red {
+  border-color: #dc2626 !important;
+  background: linear-gradient(135deg, #fee2e2, #dc2626);
+  color: white;
+}
+
+.temp-gray {
+  border-color: #6b7280 !important;
+  background: linear-gradient(135deg, #f3f4f6, #6b7280);
+  color: white;
+}
