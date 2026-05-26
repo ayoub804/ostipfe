@@ -651,8 +651,13 @@ def poste_detail(poste_id: str) -> dict[str, Any]:
     temperature = last_row.get("Temperature") if last_row else None
     temp_color, temp_text = get_temperature_status(temperature)
     
+    # Select history columns, only include Temperature if it exists
+    history_columns = ["Date", "Time", "Splice", "Error-Text"]
+    if "Temperature" in df_sim.columns:
+        history_columns.append("Temperature")
+    
     history = (
-        df_sim[["Date", "Time", "Splice", "Error-Text", "Temperature"]].tail(10).fillna("").to_dict("records")
+        df_sim[history_columns].tail(10).fillna("").to_dict("records")
         if not df_sim.empty
         else []
     )
