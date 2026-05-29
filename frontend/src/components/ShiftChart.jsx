@@ -25,7 +25,11 @@ export default function ShiftChart({ shiftHistory }) {
           </div>
           <div className="chart-main">
             <div className="y-axis">
-              <span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span>
+              <span>{maxVal}</span>
+              <span>{Math.round(maxVal * 0.75)}</span>
+              <span>{Math.round(maxVal * 0.5)}</span>
+              <span>{Math.round(maxVal * 0.25)}</span>
+              <span>0</span>
             </div>
             <div className="chart-container">
               {shiftHistory.map(day => (
