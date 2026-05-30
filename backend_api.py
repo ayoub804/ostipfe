@@ -94,18 +94,21 @@ def get_time_jump_delta(poste: "Poste") -> pd.Timedelta:
     return pd.Timedelta(hours=poste.time_jump_value)
 
 
-def get_temperature_status(temperature: float | None) -> tuple[str, str]:
+def get_temperature_status(temperature: Any) -> tuple[str, str]:
     if temperature is None:
         return "gray", "---"
-    temp = float(temperature)
-    if temp <= 45:
-        return "green", f"{temp}°C"
-    elif 46 <= temp <= 60:
-        return "yellow", f"{temp}°C"
-    elif 61 <= temp <= 70:
-        return "orange", f"{temp}°C"
-    else:  # above 71
-        return "red", f"{temp}°C"
+    try:
+        temp = float(temperature)
+        if temp <= 45:
+            return "green", f"{temp}°C"
+        elif 46 <= temp <= 60:
+            return "yellow", f"{temp}°C"
+        elif 61 <= temp <= 70:
+            return "orange", f"{temp}°C"
+        else:  # above 71
+            return "red", f"{temp}°C"
+    except (ValueError, TypeError):
+        return "gray", str(temperature) if temperature else "---"
 
 
 def compute_poste_status(poste: "Poste") -> tuple[str, str, pd.DataFrame, dict[str, Any] | None, pd.Timestamp]:
@@ -668,10 +671,15 @@ def poste_detail(poste_id: str) -> dict[str, Any]:
         # Take ALL temperature history
         temp_df = df_sim[["Timestamp", "temperature"]].dropna(subset=["temperature"])
         for _, row in temp_df.iterrows():
-            temperature_history.append({
-                "timestamp": row["Timestamp"].isoformat(),
-                "temperature": float(row["temperature"])
-            })
+            try:
+                temp_val = float(row["temperature"])
+                temperature_history.append({
+                    "timestamp": row["Timestamp"].isoformat(),
+                    "temperature": temp_val
+                })
+            except (ValueError, TypeError):
+                # Skip invalid temperature values
+                continue
 
     # Calculate shift history per day from start to current sim time, take last 10 days
     shift_history = []
