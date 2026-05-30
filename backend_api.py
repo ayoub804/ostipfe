@@ -650,29 +650,40 @@ def poste_detail(poste_id: str) -> dict[str, Any]:
     else:
         breakdown = []
     
-    # Get temperature from last row
-    temperature = last_row.get("temperature") if last_row is not None else None
+    # Get temperature from last row (check both lowercase and uppercase T)
+    temperature_column = None
+    if "temperature" in df_sim.columns:
+        temperature_column = "temperature"
+    elif "Temperature" in df_sim.columns:
+        temperature_column = "Temperature"
+    
+    temperature = last_row.get(temperature_column) if last_row is not None and temperature_column else None
     temp_color, temp_text = get_temperature_status(temperature)
     
     # Select history columns, only include temperature if it exists
     history_columns = ["Date", "Time", "Splice", "Error-Text"]
-    if "temperature" in df_sim.columns:
-        history_columns.append("temperature")
+    if temperature_column:
+        history_columns.append(temperature_column)
     
     history = (
         df_sim[history_columns].tail(10).fillna("").to_dict("records")
         if not df_sim.empty
         else []
     )
+    # Ensure history uses lowercase "temperature" key for frontend
+    if temperature_column and temperature_column != "temperature":
+        for item in history:
+            if temperature_column in item:
+                item["temperature"] = item.pop(temperature_column)
     
     # Prepare temperature history for graph
     temperature_history = []
-    if not df_sim.empty and "temperature" in df_sim.columns:
+    if not df_sim.empty and temperature_column:
         # Take ALL temperature history
-        temp_df = df_sim[["Timestamp", "temperature"]].dropna(subset=["temperature"])
+        temp_df = df_sim[["Timestamp", temperature_column]].dropna(subset=[temperature_column])
         for _, row in temp_df.iterrows():
             try:
-                temp_val = float(row["temperature"])
+                temp_val = float(row[temperature_column])
                 temperature_history.append({
                     "timestamp": row["Timestamp"].isoformat(),
                     "temperature": temp_val
