@@ -25,7 +25,7 @@ ChartJS.register(
 export default function TemperatureGraph({ data }) {
   if (!data || data.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)', background: 'var(--bg-card)', borderRadius: '16px', margin: '1rem 0', border: '1px solid var(--border)' }}>
+      <div style={{ textAlign: 'center', padding: '4rem', color: 'white', background: 'var(--bg-card)', borderRadius: '16px', margin: '1rem 0', border: '1px solid var(--border)' }}>
         Aucune donnée de température disponible
       </div>
     );
@@ -65,7 +65,7 @@ export default function TemperatureGraph({ data }) {
       title: {
         display: true,
         text: 'Température au fil du temps',
-        color: 'var(--text)',
+        color: 'white',
         font: {
           size: 24,
           weight: 'bold',
@@ -77,10 +77,10 @@ export default function TemperatureGraph({ data }) {
         }
       },
       tooltip: {
-        backgroundColor: 'var(--bg-secondary)',
-        titleColor: 'var(--text)',
-        bodyColor: 'var(--text-dim)',
-        borderColor: 'var(--accent-muted)',
+        backgroundColor: 'rgba(0,0,0,0.9)',
+        titleColor: 'white',
+        bodyColor: 'white',
+        borderColor: '#00D1FF',
         borderWidth: 2,
         padding: 16,
         titleFont: {
@@ -98,14 +98,14 @@ export default function TemperatureGraph({ data }) {
         title: {
           display: true,
           text: 'Température (°C)',
-          color: 'var(--text-dim)',
+          color: 'white',
           font: {
             family: 'Orbitron',
             size: 16,
           }
         },
         ticks: {
-          color: 'var(--text)',
+          color: 'white',
           font: {
             family: 'Inter',
             size: 14,
@@ -119,14 +119,14 @@ export default function TemperatureGraph({ data }) {
         title: {
           display: true,
           text: 'Heure',
-          color: 'var(--text-dim)',
+          color: 'white',
           font: {
             family: 'Orbitron',
             size: 16,
           }
         },
         ticks: {
-          color: 'var(--text)',
+          color: 'white',
           font: {
             family: 'Inter',
             size: 14,
