@@ -34,22 +34,18 @@ export default function TemperatureGraph({ data }) {
   const chartData = {
     labels: data.map((d) => {
       const date = new Date(d.timestamp);
-      return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     }),
     datasets: [
       {
         label: 'Température (°C)',
         data: data.map((d) => d.temperature),
-        borderColor: '#00D1FF',
-        backgroundColor: 'rgba(0, 209, 255, 0.3)',
+        borderColor: '#3b82f6',
         tension: 0.35,
-        fill: true,
-        pointRadius: 5,
-        pointHoverRadius: 8,
-        pointBackgroundColor: '#00D1FF',
-        pointBorderColor: '#0a0a0a',
-        pointBorderWidth: 3,
-        borderWidth: 4,
+        fill: false,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 2,
       },
     ],
   };
@@ -64,16 +60,16 @@ export default function TemperatureGraph({ data }) {
       },
       title: {
         display: true,
-        text: 'Température au fil du temps',
-        color: 'white',
+        text: 'temperature',
+        color: '#d1d5db',
         font: {
-          size: 24,
-          weight: 'bold',
-          family: 'Orbitron',
+          size: 16,
+          weight: 'normal',
+          family: 'sans-serif',
         },
         padding: {
-          top: 10,
-          bottom: 30,
+          top: 0,
+          bottom: 20,
         }
       },
       tooltip: {
@@ -96,40 +92,28 @@ export default function TemperatureGraph({ data }) {
       y: {
         beginAtZero: false,
         title: {
-          display: true,
-          text: 'Température (°C)',
-          color: 'white',
-          font: {
-            family: 'Orbitron',
-            size: 16,
-          }
+          display: false,
         },
         ticks: {
-          color: 'white',
+          color: '#9ca3af',
           font: {
-            family: 'Inter',
-            size: 14,
+            family: 'sans-serif',
+            size: 12,
           }
         },
         grid: {
-          color: 'rgba(255, 255, 255, 0.1)',
+          color: 'rgba(255, 255, 255, 0.05)',
         },
       },
       x: {
         title: {
-          display: true,
-          text: 'Heure',
-          color: 'white',
-          font: {
-            family: 'Orbitron',
-            size: 16,
-          }
+          display: false,
         },
         ticks: {
-          color: 'white',
+          color: '#9ca3af',
           font: {
-            family: 'Inter',
-            size: 14,
+            family: 'sans-serif',
+            size: 12,
           }
         },
         grid: {
@@ -141,12 +125,10 @@ export default function TemperatureGraph({ data }) {
 
   return (
     <div style={{
-      background: 'var(--bg-card)',
-      borderRadius: '16px',
-      padding: '2.5rem',
-      boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+      background: '#2b2b2b',
+      borderRadius: '4px',
+      padding: '1.5rem',
       margin: '1.5rem 0',
-      border: '1px solid var(--border)',
     }}>
       <Line data={chartData} options={options} />
     </div>
