@@ -578,177 +578,228 @@ def export_history(poste_id: str, start: str, end: str):
 
 @app.get("/api/postes/{poste_id}")
 def poste_detail(poste_id: str) -> dict[str, Any]:
-    poste = _get_poste(poste_id)
-    color, status, df_sim, last_row, last_activity = compute_poste_status(poste)
-    poste.last_activity_time = last_activity
+    try:
+        poste = _get_poste(poste_id)
+        color, status, df_sim, last_row, last_activity = compute_poste_status(poste)
+        poste.last_activity_time = last_activity
 
-    min_ts = poste.data["Timestamp"].min()
-    max_ts = poste.data["Timestamp"].max()
-    filter_start = poste.filter_start or min_ts.to_pydatetime()
-    filter_end = poste.filter_end or max_ts.to_pydatetime()
-    
-    # Convert to pandas Timestamps and handle timezones
-    fs = pd.Timestamp(filter_start)
-    fe = pd.Timestamp(filter_end)
-    
-    data_tz = poste.data["Timestamp"].dt.tz
-    if data_tz is None:
-        if fs.tz is not None: fs = fs.tz_localize(None)
-        if fe.tz is not None: fe = fe.tz_localize(None)
-    else:
-        if fs.tz is None: fs = fs.tz_localize(data_tz)
-        if fe.tz is None: fe = fe.tz_localize(data_tz)
-
-    df_filtered = df_sim[(df_sim["Timestamp"] >= fs) & (df_sim["Timestamp"] <= fe)] if not df_sim.empty else pd.DataFrame()
-    total_filtered = int(len(df_filtered))
-
-    current_day = poste.current_sim_time.date()
-    df_today = df_sim[df_sim["Timestamp"].dt.date == current_day] if not df_sim.empty else pd.DataFrame()
-    total_today = int(len(df_today))
-
-    if not df_today.empty:
-        minutes = df_today["Timestamp"].dt.hour * 60 + df_today["Timestamp"].dt.minute
-        shift_1 = int(((minutes >= 360) & (minutes < 870)).sum())
-        shift_2 = int(((minutes >= 870) & (minutes < 1320)).sum())
-        shift_3 = int(((minutes >= 1320) | (minutes < 360)).sum())
-    else:
-        shift_1 = 0
-        shift_2 = 0
-        shift_3 = 0
-
-    now_time = poste.current_sim_time.time()
-    shift_start_1 = pd.Timestamp(current_day).replace(hour=6, minute=0)
-    shift_end_1 = pd.Timestamp(current_day).replace(hour=14, minute=30)
-    shift_start_2 = pd.Timestamp(current_day).replace(hour=14, minute=30)
-    shift_end_2 = pd.Timestamp(current_day).replace(hour=22, minute=0)
-    shift_start_3 = pd.Timestamp(current_day).replace(hour=22, minute=0)
-    # Shift 3 spans midnight, so we check for both parts
-    if shift_start_1.time() <= now_time < shift_end_1.time():
-        df_shift = df_today[(df_today["Timestamp"] >= shift_start_1) & (df_today["Timestamp"] < shift_end_1)]
-    elif shift_start_2.time() <= now_time < shift_end_2.time():
-        df_shift = df_today[(df_today["Timestamp"] >= shift_start_2) & (df_today["Timestamp"] < shift_end_2)]
-    elif now_time >= shift_start_3.time() or now_time < shift_start_1.time():
-        # This handles the spanning midnight logic
-        df_shift = df_today[(df_today["Timestamp"] >= shift_start_3) | (df_today["Timestamp"] < shift_start_1)]
-    else:
-        df_shift = pd.DataFrame()
-
-    # breakdown logic fix
-    if not df_sim.empty and "Splice" in df_sim.columns:
-        counts = df_sim["Splice"].value_counts().reset_index()
-        # Handle different pandas versions for value_counts().reset_index()
-        # In newer versions it might have columns ['Splice', 'count']
-        # In older versions it might have columns ['index', 'Splice']
-        if "index" in counts.columns:
-            counts = counts.rename(columns={"index": "name", "Splice": "qty"})
-        elif "count" in counts.columns:
-            counts = counts.rename(columns={"Splice": "name", "count": "qty"})
+        min_ts = poste.data["Timestamp"].min()
+        max_ts = poste.data["Timestamp"].max()
+        filter_start = poste.filter_start or min_ts.to_pydatetime()
+        filter_end = poste.filter_end or max_ts.to_pydatetime()
+        
+        # Convert to pandas Timestamps and handle timezones
+        fs = pd.Timestamp(filter_start)
+        fe = pd.Timestamp(filter_end)
+        
+        data_tz = poste.data["Timestamp"].dt.tz
+        if data_tz is None:
+            if fs.tz is not None: fs = fs.tz_localize(None)
+            if fe.tz is not None: fe = fe.tz_localize(None)
         else:
-            # Fallback for other potential structures
-            counts.columns = ["name", "qty"]
-        breakdown = counts.to_dict("records")
-    else:
+            if fs.tz is None: fs = fs.tz_localize(data_tz)
+            if fe.tz is None: fe = fe.tz_localize(data_tz)
+
+        df_filtered = df_sim[(df_sim["Timestamp"] >= fs) & (df_sim["Timestamp"] <= fe)] if not df_sim.empty else pd.DataFrame()
+        total_filtered = int(len(df_filtered))
+
+        current_day = poste.current_sim_time.date()
+        df_today = df_sim[df_sim["Timestamp"].dt.date == current_day] if not df_sim.empty else pd.DataFrame()
+        total_today = int(len(df_today))
+
+        if not df_today.empty:
+            minutes = df_today["Timestamp"].dt.hour * 60 + df_today["Timestamp"].dt.minute
+            shift_1 = int(((minutes >= 360) & (minutes < 870)).sum())
+            shift_2 = int(((minutes >= 870) & (minutes < 1320)).sum())
+            shift_3 = int(((minutes >= 1320) | (minutes < 360)).sum())
+        else:
+            shift_1 = 0
+            shift_2 = 0
+            shift_3 = 0
+
+        now_time = poste.current_sim_time.time()
+        shift_start_1 = pd.Timestamp(current_day).replace(hour=6, minute=0)
+        shift_end_1 = pd.Timestamp(current_day).replace(hour=14, minute=30)
+        shift_start_2 = pd.Timestamp(current_day).replace(hour=14, minute=30)
+        shift_end_2 = pd.Timestamp(current_day).replace(hour=22, minute=0)
+        shift_start_3 = pd.Timestamp(current_day).replace(hour=22, minute=0)
+        # Shift 3 spans midnight, so we check for both parts
+        if shift_start_1.time() <= now_time < shift_end_1.time():
+            df_shift = df_today[(df_today["Timestamp"] >= shift_start_1) & (df_today["Timestamp"] < shift_end_1)]
+        elif shift_start_2.time() <= now_time < shift_end_2.time():
+            df_shift = df_today[(df_today["Timestamp"] >= shift_start_2) & (df_today["Timestamp"] < shift_end_2)]
+        elif now_time >= shift_start_3.time() or now_time < shift_start_1.time():
+            # This handles the spanning midnight logic
+            df_shift = df_today[(df_today["Timestamp"] >= shift_start_3) | (df_today["Timestamp"] < shift_start_1)]
+        else:
+            df_shift = pd.DataFrame()
+
+        # breakdown logic fix
         breakdown = []
-    
-    # Get temperature from last row (check both lowercase and uppercase T)
-    temperature_column = None
-    if "temperature" in df_sim.columns:
-        temperature_column = "temperature"
-    elif "Temperature" in df_sim.columns:
-        temperature_column = "Temperature"
-    
-    temperature = last_row.get(temperature_column) if last_row is not None and temperature_column else None
-    temp_color, temp_text = get_temperature_status(temperature)
-    
-    # Select history columns, only include temperature if it exists
-    history_columns = ["Date", "Time", "Splice", "Error-Text"]
-    if temperature_column:
-        history_columns.append(temperature_column)
-    
-    history = (
-        df_sim[history_columns].tail(10).fillna("").to_dict("records")
-        if not df_sim.empty
-        else []
-    )
-    # Ensure history uses lowercase "temperature" key for frontend
-    if temperature_column and temperature_column != "temperature":
-        for item in history:
-            if temperature_column in item:
-                item["temperature"] = item.pop(temperature_column)
-    
-    # Prepare temperature history for graph
-    temperature_history = []
-    if not df_sim.empty and temperature_column:
-        # Take ALL temperature history
-        temp_df = df_sim[["Timestamp", temperature_column]].dropna(subset=[temperature_column])
-        for _, row in temp_df.iterrows():
-            try:
-                temp_val = float(row[temperature_column])
-                temperature_history.append({
-                    "timestamp": row["Timestamp"].isoformat(),
-                    "temperature": temp_val
+        if not df_sim.empty and "Splice" in df_sim.columns:
+            counts = df_sim["Splice"].value_counts().reset_index()
+            # Handle different pandas versions for value_counts().reset_index()
+            # In newer versions it might have columns ['Splice', 'count']
+            # In older versions it might have columns ['index', 'Splice']
+            if "index" in counts.columns:
+                counts = counts.rename(columns={"index": "name", "Splice": "qty"})
+            elif "count" in counts.columns:
+                counts = counts.rename(columns={"Splice": "name", "count": "qty"})
+            else:
+                # Fallback for other potential structures
+                counts.columns = ["name", "qty"]
+            breakdown = counts.to_dict("records")
+        
+        # Get temperature from last row (check both lowercase and uppercase T)
+        temperature_column = None
+        if not df_sim.empty:
+            if "temperature" in df_sim.columns:
+                temperature_column = "temperature"
+            elif "Temperature" in df_sim.columns:
+                temperature_column = "Temperature"
+        
+        temperature = None
+        if last_row is not None and temperature_column:
+            temperature = last_row.get(temperature_column)
+        temp_color, temp_text = get_temperature_status(temperature)
+        
+        # Select history columns, only include temperature if it exists
+        history_columns = ["Date", "Time", "Splice", "Error-Text"]
+        if temperature_column:
+            history_columns.append(temperature_column)
+        
+        history = []
+        if not df_sim.empty:
+            history = df_sim[history_columns].tail(10).fillna("").to_dict("records")
+        # Ensure history uses lowercase "temperature" key for frontend
+        if temperature_column and temperature_column != "temperature":
+            for item in history:
+                if temperature_column in item:
+                    item["temperature"] = item.pop(temperature_column)
+        
+        # Prepare temperature history for graph
+        temperature_history = []
+        if not df_sim.empty and temperature_column:
+            # Take ALL temperature history
+            temp_df = df_sim[["Timestamp", temperature_column]].dropna(subset=[temperature_column])
+            for _, row in temp_df.iterrows():
+                try:
+                    temp_val = float(row[temperature_column])
+                    temperature_history.append({
+                        "timestamp": row["Timestamp"].isoformat(),
+                        "temperature": temp_val
+                    })
+                except (ValueError, TypeError):
+                    # Skip invalid temperature values
+                    continue
+
+        # Calculate shift history per day from start to current sim time, take last 10 days
+        shift_history = []
+        if not df_sim.empty:
+            # Sort days to ensure chronological order
+            unique_days = sorted(df_sim["Timestamp"].dt.date.unique())
+            # Take last 10 days
+            last_10_days = unique_days[-10:]
+            for d in last_10_days:
+                df_day = df_sim[df_sim["Timestamp"].dt.date == d]
+                minutes = df_day["Timestamp"].dt.hour * 60 + df_day["Timestamp"].dt.minute
+                s1 = int(((minutes >= 360) & (minutes < 870)).sum())
+                s2 = int(((minutes >= 870) & (minutes < 1320)).sum())
+                s3 = int(((minutes >= 1320) | (minutes < 360)).sum())
+                shift_history.append({
+                    "date": str(d),
+                    "shift1": s1,
+                    "shift2": s2,
+                    "shift3": s3
                 })
-            except (ValueError, TypeError):
-                # Skip invalid temperature values
-                continue
 
-    # Calculate shift history per day from start to current sim time, take last 10 days
-    shift_history = []
-    if not df_sim.empty:
-        # Sort days to ensure chronological order
-        unique_days = sorted(df_sim["Timestamp"].dt.date.unique())
-        # Take last 10 days
-        last_10_days = unique_days[-10:]
-        for d in last_10_days:
-            df_day = df_sim[df_sim["Timestamp"].dt.date == d]
-            minutes = df_day["Timestamp"].dt.hour * 60 + df_day["Timestamp"].dt.minute
-            s1 = int(((minutes >= 360) & (minutes < 870)).sum())
-            s2 = int(((minutes >= 870) & (minutes < 1320)).sum())
-            s3 = int(((minutes >= 1320) | (minutes < 360)).sum())
-            shift_history.append({
-                "date": str(d),
-                "shift1": s1,
-                "shift2": s2,
-                "shift3": s3
-            })
+        # Build last activity safely
+        last_activity_str = None
+        if last_row is not None:
+            date_part = last_row.get("Date", "")
+            time_part = last_row.get("Time", "")
+            if date_part or time_part:
+                last_activity_str = f"{date_part} {time_part}".strip()
 
-    return {
-        "id": poste.id,
-        "name": poste.name,
-        "statusColor": color,
-        "statusText": status,
-        "currentSimTime": poste.current_sim_time.isoformat(),
-        "lastActivity": f"{last_row['Date']} {last_row['Time']}" if last_row else None,
-        "totalFiltered": total_filtered,
-        "totalToday": total_today,
-        "totalShift": int(len(df_shift)),
-        "spliceCurrent": str(last_row.get("Splice", "---")) if last_row else "---",
-        "isPaused": poste.is_paused,
-        "simDelay": poste.sim_delay,
-        "timeJumpValue": poste.time_jump_value,
-        "timeJumpUnit": poste.time_jump_unit,
-        "filterStart": filter_start.isoformat(),
-        "filterEnd": filter_end.isoformat(),
-        "shiftDay": {
-            "shift1": shift_1,
-            "shift2": shift_2,
-            "shift3": shift_3,
-            "total": total_today,
-            "date": str(current_day),
-        },
-        "shiftFilter": {
-            "shift1": int(((df_filtered["Timestamp"].dt.hour * 60 + df_filtered["Timestamp"].dt.minute >= 360) & (df_filtered["Timestamp"].dt.hour * 60 + df_filtered["Timestamp"].dt.minute < 870)).sum()) if not df_filtered.empty else 0,
-            "shift2": int(((df_filtered["Timestamp"].dt.hour * 60 + df_filtered["Timestamp"].dt.minute >= 870) & (df_filtered["Timestamp"].dt.hour * 60 + df_filtered["Timestamp"].dt.minute < 1320)).sum()) if not df_filtered.empty else 0,
-            "shift3": int(((df_filtered["Timestamp"].dt.hour * 60 + df_filtered["Timestamp"].dt.minute >= 1320) | (df_filtered["Timestamp"].dt.hour * 60 + df_filtered["Timestamp"].dt.minute < 360)).sum()) if not df_filtered.empty else 0,
-            "total": total_filtered,
-        },
-        "breakdown": breakdown,
-        "history": history,
-        "shiftHistory": shift_history,
-        "temperature": temp_text,
-        "temperatureColor": temp_color,
-        "temperatureHistory": temperature_history,
-    }
+        # Build splice current safely
+        splice_current = "---"
+        if last_row is not None:
+            splice_current = str(last_row.get("Splice", "---"))
+
+        # Build shift filter safely
+        sf_s1, sf_s2, sf_s3 = 0, 0, 0
+        if not df_filtered.empty:
+            minutes = df_filtered["Timestamp"].dt.hour * 60 + df_filtered["Timestamp"].dt.minute
+            sf_s1 = int(((minutes >= 360) & (minutes < 870)).sum())
+            sf_s2 = int(((minutes >= 870) & (minutes < 1320)).sum())
+            sf_s3 = int(((minutes >= 1320) | (minutes < 360)).sum())
+
+        return {
+            "id": poste.id,
+            "name": poste.name,
+            "statusColor": color,
+            "statusText": status,
+            "currentSimTime": poste.current_sim_time.isoformat(),
+            "lastActivity": last_activity_str,
+            "totalFiltered": total_filtered,
+            "totalToday": total_today,
+            "totalShift": int(len(df_shift)),
+            "spliceCurrent": splice_current,
+            "isPaused": poste.is_paused,
+            "simDelay": poste.sim_delay,
+            "timeJumpValue": poste.time_jump_value,
+            "timeJumpUnit": poste.time_jump_unit,
+            "filterStart": filter_start.isoformat(),
+            "filterEnd": filter_end.isoformat(),
+            "shiftDay": {
+                "shift1": shift_1,
+                "shift2": shift_2,
+                "shift3": shift_3,
+                "total": total_today,
+                "date": str(current_day),
+            },
+            "shiftFilter": {
+                "shift1": sf_s1,
+                "shift2": sf_s2,
+                "shift3": sf_s3,
+                "total": total_filtered,
+            },
+            "breakdown": breakdown,
+            "history": history,
+            "shiftHistory": shift_history,
+            "temperature": temp_text,
+            "temperatureColor": temp_color,
+            "temperatureHistory": temperature_history,
+        }
+    except Exception as e:
+        # Fallback in case anything goes wrong!
+        poste = _get_poste(poste_id)
+        return {
+            "id": poste.id,
+            "name": poste.name,
+            "statusColor": "gray",
+            "statusText": "Erreur chargement données",
+            "currentSimTime": poste.current_sim_time.isoformat(),
+            "lastActivity": None,
+            "totalFiltered": 0,
+            "totalToday": 0,
+            "totalShift": 0,
+            "spliceCurrent": "---",
+            "isPaused": poste.is_paused,
+            "simDelay": poste.sim_delay,
+            "timeJumpValue": poste.time_jump_value,
+            "timeJumpUnit": poste.time_jump_unit,
+            "filterStart": (poste.filter_start or poste.current_sim_time).isoformat(),
+            "filterEnd": (poste.filter_end or poste.current_sim_time).isoformat(),
+            "shiftDay": {"shift1":0,"shift2":0,"shift3":0,"total":0,"date":str(poste.current_sim_time.date())},
+            "shiftFilter": {"shift1":0,"shift2":0,"shift3":0,"total":0},
+            "breakdown": [],
+            "history": [],
+            "shiftHistory": [],
+            "temperature": "---",
+            "temperatureColor": "gray",
+            "temperatureHistory": []
+        }
 
 # Serve frontend static files
 frontend_dist = Path("frontend/dist")

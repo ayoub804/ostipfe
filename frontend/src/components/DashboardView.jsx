@@ -11,10 +11,11 @@ export default function DashboardView({ detail, selected, onBack }) {
 
   const shiftFilterRows = useMemo(() => {
     if (!detail) return [];
+    const sf = detail.shiftFilter || {};
     return [
-      { label: "Équipe 1 (06:00-14:30)", value: detail.shiftFilter.shift1 },
-      { label: "Équipe 2 (14:30-22:00)", value: detail.shiftFilter.shift2 },
-      { label: "Équipe 3 (22:00-06:00)", value: detail.shiftFilter.shift3 },
+      { label: "Équipe 1 (06:00-14:30)", value: sf.shift1 || 0 },
+      { label: "Équipe 2 (14:30-22:00)", value: sf.shift2 || 0 },
+      { label: "Équipe 3 (22:00-06:00)", value: sf.shift3 || 0 },
     ];
   }, [detail]);
 
@@ -25,46 +26,63 @@ export default function DashboardView({ detail, selected, onBack }) {
     window.open(exportHistoryUrl(selected, exportStart, exportEnd), "_blank");
   }
 
+  const safeDetail = {
+    ...detail,
+    statusColor: detail.statusColor || "gray",
+    statusText: detail.statusText || "---",
+    totalFiltered: detail.totalFiltered || 0,
+    totalToday: detail.totalToday || 0,
+    totalShift: detail.totalShift || 0,
+    spliceCurrent: detail.spliceCurrent || "---",
+    shiftDay: detail.shiftDay || { shift1: 0, shift2: 0, shift3: 0, total: 0, date: "" },
+    shiftHistory: detail.shiftHistory || [],
+    temperatureHistory: detail.temperatureHistory || [],
+    breakdown: detail.breakdown || [],
+    history: detail.history || []
+  };
+
+  const hasTemperatureColumn = safeDetail.history.length > 0 && safeDetail.history[0].temperature !== undefined;
+
   return (
     <div>
       <button className="btn btn-ghost" onClick={onBack} style={{ marginBottom: 16 }}>← Retour à l'accueil</button>
-      <h1 className="page-title">Suivi — {detail.name}</h1>
+      <h1 className="page-title">Suivi — {safeDetail.name}</h1>
 
       <div className="kpi-row">
-        <div className={`big-status ${detail.statusColor}`}>
+        <div className={`big-status ${safeDetail.statusColor}`}>
           <ComputerIcon className="pc-icon" />
         </div>
         <div className="shift-circle">
           <div>Équipe</div>
-          <strong>{detail.totalShift}</strong>
+          <strong>{safeDetail.totalShift}</strong>
           <small>Pièces</small>
         </div>
-        {detail.temperature !== undefined && (
-          <div className={`shift-circle temp-${detail.temperatureColor || "gray"}`}>
+        {safeDetail.temperature !== undefined && (
+          <div className={`shift-circle temp-${safeDetail.temperatureColor || "gray"}`}>
             <div>Temp</div>
-            <strong className="temp-value">{detail.temperature}</strong>
+            <strong className="temp-value">{safeDetail.temperature}</strong>
           </div>
         )}
         <div className="meta-info">
-          <div>Statut : <span>{detail.statusText}</span></div>
-          <div>Temps simulé : <span>{new Date(detail.currentSimTime).toLocaleString()}</span></div>
-          <div>Dernière activité : <span>{detail.lastActivity || "---"}</span></div>
+          <div>Statut : <span>{safeDetail.statusText}</span></div>
+          <div>Temps simulé : <span>{safeDetail.currentSimTime ? new Date(safeDetail.currentSimTime).toLocaleString() : "---"}</span></div>
+          <div>Dernière activité : <span>{safeDetail.lastActivity || "---"}</span></div>
         </div>
       </div>
 
       <div className="metrics">
-        <div className="metric">Total filtré<div className="metric-val">{detail.totalFiltered}</div></div>
-        <div className="metric">Aujourd'hui<div className="metric-val">{detail.totalToday}</div></div>
-        <div className="metric">Splice actuel<div className="metric-val">{detail.spliceCurrent}</div></div>
+        <div className="metric">Total filtré<div className="metric-val">{safeDetail.totalFiltered}</div></div>
+        <div className="metric">Aujourd'hui<div className="metric-val">{safeDetail.totalToday}</div></div>
+        <div className="metric">Splice actuel<div className="metric-val">{safeDetail.spliceCurrent}</div></div>
       </div>
 
       <h3 style={{ marginBottom: 8 }}>Équipes — Jour simulé</h3>
       <table>
         <tbody>
-          <tr><td>Équipe 1 (06:00-14:30)</td><td>{detail.shiftDay.shift1}</td></tr>
-          <tr><td>Équipe 2 (14:30-22:00)</td><td>{detail.shiftDay.shift2}</td></tr>
-          <tr><td>Équipe 3 (22:00-06:00)</td><td>{detail.shiftDay.shift3}</td></tr>
-          <tr><td><strong>Total</strong></td><td><strong>{detail.shiftDay.total}</strong></td></tr>
+          <tr><td>Équipe 1 (06:00-14:30)</td><td>{safeDetail.shiftDay.shift1}</td></tr>
+          <tr><td>Équipe 2 (14:30-22:00)</td><td>{safeDetail.shiftDay.shift2}</td></tr>
+          <tr><td>Équipe 3 (22:00-06:00)</td><td>{safeDetail.shiftDay.shift3}</td></tr>
+          <tr><td><strong>Total</strong></td><td><strong>{safeDetail.shiftDay.total}</strong></td></tr>
         </tbody>
       </table>
 
@@ -75,9 +93,9 @@ export default function DashboardView({ detail, selected, onBack }) {
         </tbody>
       </table>
 
-      <ShiftChart shiftHistory={detail.shiftHistory} />
+      <ShiftChart shiftHistory={safeDetail.shiftHistory} />
 
-      <TemperatureGraph data={detail.temperatureHistory} />
+      <TemperatureGraph data={safeDetail.temperatureHistory} />
 
       <div className="section-header">
         <h3>Détails par splice</h3>
@@ -89,7 +107,7 @@ export default function DashboardView({ detail, selected, onBack }) {
       <table>
         <thead><tr><th>Nom</th><th>Quantité</th></tr></thead>
         <tbody>
-          {detail.breakdown.filter(r => r.name.toLowerCase().includes(spliceSearch.toLowerCase())).map((r, i) => (
+          {safeDetail.breakdown.filter(r => (r.name || "").toLowerCase().includes((spliceSearch || "").toLowerCase())).map((r, i) => (
             <tr key={`${r.name}-${i}`}><td>{r.name}</td><td>{r.qty}</td></tr>
           ))}
         </tbody>
@@ -110,17 +128,17 @@ export default function DashboardView({ detail, selected, onBack }) {
             <th>Date</th>
             <th>Heure</th>
             <th>Splice</th>
-            {detail.history.length > 0 && detail.history[0].temperature !== undefined && <th>Température</th>}
+            {hasTemperatureColumn && <th>Température</th>}
             <th>Erreur</th>
           </tr>
         </thead>
         <tbody>
-          {detail.history.map((r, i) => (
+          {safeDetail.history.map((r, i) => (
             <tr key={i}>
               <td>{r.Date}</td>
               <td>{r.Time}</td>
               <td>{r.Splice}</td>
-              {detail.history.length > 0 && detail.history[0].temperature !== undefined && <td>{r.temperature || "---"}</td>}
+              {hasTemperatureColumn && <td>{r.temperature || "---"}</td>}
               <td>{r["Error-Text"]}</td>
             </tr>
           ))}
