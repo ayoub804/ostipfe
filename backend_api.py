@@ -648,7 +648,7 @@ def poste_detail(poste_id: str) -> dict[str, Any]:
         breakdown = []
     
     # Get temperature from last row
-    temperature = last_row.get("Temperature") if last_row else None
+    temperature = last_row["Temperature"] if last_row is not None and "Temperature" in last_row.index else None
     temp_color, temp_text = get_temperature_status(temperature)
     
     # Select history columns, only include Temperature if it exists
