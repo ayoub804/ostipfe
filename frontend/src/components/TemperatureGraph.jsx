@@ -43,7 +43,7 @@ export default function TemperatureGraph({ data }) {
         borderColor: '#3b82f6',
         tension: 0.35,
         fill: false,
-        pointRadius: 0,
+        pointRadius: data.length > 1 ? 0 : 3,
         pointHoverRadius: 4,
         borderWidth: 2,
       },
