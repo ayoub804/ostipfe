@@ -38,7 +38,7 @@ export default function DashboardView({ detail, selected, onBack }) {
           <strong>{detail.totalShift}</strong>
           <small>PIÈCES</small>
         </div>
-        {detail.temperature && (
+        {detail.temperature && detail.temperature !== "---" && (
           <div className={`shift-circle temp-${detail.temperatureColor || "gray"}`}>
             <div>TEMP</div>
             <strong>{detail.temperature}</strong>
