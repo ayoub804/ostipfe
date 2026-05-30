@@ -25,7 +25,7 @@ ChartJS.register(
 export default function TemperatureGraph({ data }) {
   if (!data || data.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+      <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
         Aucune donnée de température disponible
       </div>
     );
@@ -40,12 +40,15 @@ export default function TemperatureGraph({ data }) {
       {
         label: 'Température (°C)',
         data: data.map((d) => d.temperature),
-        borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderColor: '#00D1FF',
+        backgroundColor: 'rgba(0, 209, 255, 0.15)',
         tension: 0.4,
         fill: true,
         pointRadius: 4,
         pointHoverRadius: 6,
+        pointBackgroundColor: '#00D1FF',
+        pointBorderColor: '#0a0a0a',
+        pointBorderWidth: 2,
       },
     ],
   };
@@ -60,11 +63,18 @@ export default function TemperatureGraph({ data }) {
       title: {
         display: true,
         text: 'Température au fil du temps',
-        color: '#1e293b',
+        color: 'var(--text)',
         font: {
           size: 18,
           weight: 'bold',
         },
+      },
+      tooltip: {
+        backgroundColor: 'var(--bg-secondary)',
+        titleColor: 'var(--text)',
+        bodyColor: 'var(--text-dim)',
+        borderColor: 'var(--border)',
+        borderWidth: 1,
       },
     },
     scales: {
@@ -73,12 +83,26 @@ export default function TemperatureGraph({ data }) {
         title: {
           display: true,
           text: 'Température (°C)',
+          color: 'var(--text-dim)',
+        },
+        ticks: {
+          color: 'var(--text-muted)',
+        },
+        grid: {
+          color: 'var(--border)',
         },
       },
       x: {
         title: {
           display: true,
           text: 'Heure',
+          color: 'var(--text-dim)',
+        },
+        ticks: {
+          color: 'var(--text-muted)',
+        },
+        grid: {
+          color: 'var(--border)',
         },
       },
     },
@@ -86,12 +110,13 @@ export default function TemperatureGraph({ data }) {
 
   return (
     <div style={{
-      background: 'white',
+      background: 'var(--bg-card)',
       borderRadius: '16px',
       padding: '1.5rem',
       boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
       margin: '1rem 0',
-      height: '400px'
+      height: '400px',
+      border: '1px solid var(--border)',
     }}>
       <Line data={chartData} options={options} />
     </div>

@@ -12,9 +12,9 @@ export default function DashboardView({ detail, selected, onBack }) {
   const shiftFilterRows = useMemo(() => {
     if (!detail) return [];
     return [
-      { label: "Shift 1 (06:00-14:30)", value: detail.shiftFilter.shift1 },
-      { label: "Shift 2 (14:30-22:00)", value: detail.shiftFilter.shift2 },
-      { label: "Shift 3 (22:00-06:00)", value: detail.shiftFilter.shift3 },
+      { label: "Équipe 1 (06:00-14:30)", value: detail.shiftFilter.shift1 },
+      { label: "Équipe 2 (14:30-22:00)", value: detail.shiftFilter.shift2 },
+      { label: "Équipe 3 (22:00-06:00)", value: detail.shiftFilter.shift3 },
     ];
   }, [detail]);
 
@@ -35,13 +35,13 @@ export default function DashboardView({ detail, selected, onBack }) {
           <ComputerIcon className="pc-icon" />
         </div>
         <div className="shift-circle">
-          <div>SHIFT</div>
+          <div>Équipe</div>
           <strong>{detail.totalShift}</strong>
-          <small>PIÈCES</small>
+          <small>Pièces</small>
         </div>
         {detail.temperature !== undefined && (
           <div className={`shift-circle temp-${detail.temperatureColor || "gray"}`}>
-            <div>TEMP</div>
+            <div>Temp</div>
             <strong>{detail.temperature}</strong>
           </div>
         )}
@@ -53,22 +53,22 @@ export default function DashboardView({ detail, selected, onBack }) {
       </div>
 
       <div className="metrics">
-        <div className="metric">Total filtrées<div className="metric-val">{detail.totalFiltered}</div></div>
+        <div className="metric">Total filtré<div className="metric-val">{detail.totalFiltered}</div></div>
         <div className="metric">Aujourd'hui<div className="metric-val">{detail.totalToday}</div></div>
         <div className="metric">Splice actuel<div className="metric-val">{detail.spliceCurrent}</div></div>
       </div>
 
-      <h3 style={{ marginBottom: 8 }}>Shifts — jour simulé</h3>
+      <h3 style={{ marginBottom: 8 }}>Équipes — Jour simulé</h3>
       <table>
         <tbody>
-          <tr><td>Shift 1 (06:00-14:30)</td><td>{detail.shiftDay.shift1}</td></tr>
-          <tr><td>Shift 2 (14:30-22:00)</td><td>{detail.shiftDay.shift2}</td></tr>
-          <tr><td>Shift 3 (22:00-06:00)</td><td>{detail.shiftDay.shift3}</td></tr>
+          <tr><td>Équipe 1 (06:00-14:30)</td><td>{detail.shiftDay.shift1}</td></tr>
+          <tr><td>Équipe 2 (14:30-22:00)</td><td>{detail.shiftDay.shift2}</td></tr>
+          <tr><td>Équipe 3 (22:00-06:00)</td><td>{detail.shiftDay.shift3}</td></tr>
           <tr><td><strong>Total</strong></td><td><strong>{detail.shiftDay.total}</strong></td></tr>
         </tbody>
       </table>
 
-      <h3 style={{ marginBottom: 8 }}>Shifts — filtre</h3>
+      <h3 style={{ marginBottom: 8 }}>Équipes — Filtre</h3>
       <table>
         <tbody>
           {shiftFilterRows.map(r => <tr key={r.label}><td>{r.label}</td><td>{r.value}</td></tr>)}
@@ -108,10 +108,10 @@ export default function DashboardView({ detail, selected, onBack }) {
         <thead>
           <tr>
             <th>Date</th>
-            <th>Time</th>
+            <th>Heure</th>
             <th>Splice</th>
-            {detail.history.length > 0 && detail.history[0].Temperature !== undefined && <th>Température</th>}
-            <th>Error</th>
+            {detail.history.length > 0 && detail.history[0].temperature !== undefined && <th>Température</th>}
+            <th>Erreur</th>
           </tr>
         </thead>
         <tbody>
@@ -120,7 +120,7 @@ export default function DashboardView({ detail, selected, onBack }) {
               <td>{r.Date}</td>
               <td>{r.Time}</td>
               <td>{r.Splice}</td>
-              {detail.history.length > 0 && detail.history[0].Temperature !== undefined && <td>{r.Temperature || "---"}</td>}
+              {detail.history.length > 0 && detail.history[0].temperature !== undefined && <td>{r.temperature || "---"}</td>}
               <td>{r["Error-Text"]}</td>
             </tr>
           ))}

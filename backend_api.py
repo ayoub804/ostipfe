@@ -648,13 +648,13 @@ def poste_detail(poste_id: str) -> dict[str, Any]:
         breakdown = []
     
     # Get temperature from last row
-    temperature = last_row.get("Temperature") if last_row is not None else None
+    temperature = last_row.get("temperature") if last_row is not None else None
     temp_color, temp_text = get_temperature_status(temperature)
     
-    # Select history columns, only include Temperature if it exists
+    # Select history columns, only include temperature if it exists
     history_columns = ["Date", "Time", "Splice", "Error-Text"]
-    if "Temperature" in df_sim.columns:
-        history_columns.append("Temperature")
+    if "temperature" in df_sim.columns:
+        history_columns.append("temperature")
     
     history = (
         df_sim[history_columns].tail(10).fillna("").to_dict("records")
@@ -664,13 +664,13 @@ def poste_detail(poste_id: str) -> dict[str, Any]:
     
     # Prepare temperature history for graph
     temperature_history = []
-    if not df_sim.empty and "Temperature" in df_sim.columns:
-        # Take last 30 rows for temperature graph
-        temp_df = df_sim[["Timestamp", "Temperature"]].tail(30).dropna(subset=["Temperature"])
+    if not df_sim.empty and "temperature" in df_sim.columns:
+        # Take ALL temperature history
+        temp_df = df_sim[["Timestamp", "temperature"]].dropna(subset=["temperature"])
         for _, row in temp_df.iterrows():
             temperature_history.append({
                 "timestamp": row["Timestamp"].isoformat(),
-                "temperature": float(row["Temperature"])
+                "temperature": float(row["temperature"])
             })
 
     # Calculate shift history per day from start to current sim time, take last 10 days

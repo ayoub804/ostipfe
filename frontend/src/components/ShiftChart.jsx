@@ -16,11 +16,11 @@ export default function ShiftChart({ shiftHistory }) {
       {open && (
         <div className="shifts-chart">
           <div className="chart-header">
-            <h3>📊 Analyse de Production par Shift</h3>
+            <h3>📊 Analyse de Production par Équipe</h3>
             <div className="chart-legend">
-              <span className="legend-item"><i className="dot s1" /> Shift 1</span>
-              <span className="legend-item"><i className="dot s2" /> Shift 2</span>
-              <span className="legend-item"><i className="dot s3" /> Shift 3</span>
+              <span className="legend-item"><i className="dot s1" /> Équipe 1</span>
+              <span className="legend-item"><i className="dot s2" /> Équipe 2</span>
+              <span className="legend-item"><i className="dot s3" /> Équipe 3</span>
             </div>
           </div>
           <div className="chart-main">
@@ -36,7 +36,7 @@ export default function ShiftChart({ shiftHistory }) {
                 <div key={day.date} className="chart-group">
                   <div className="bars">
                     {["shift1", "shift2", "shift3"].map((s, i) => (
-                      <div key={s} className={`bar s${i + 1}`} style={{ height: `${(day[s] / maxVal) * 100}%` }} title={`Shift ${i + 1}: ${day[s]}`}>
+                      <div key={s} className={`bar s${i + 1}`} style={{ height: `${(day[s] / maxVal) * 100}%` }} title={`Équipe ${i + 1}: ${day[s]}`}>
                         {day[s] > 0 && <span className="bar-val">{day[s]}</span>}
                       </div>
                     ))}
