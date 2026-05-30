@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import ComputerIcon from "./ComputerIcon";
 import ShiftChart from "./ShiftChart";
+import TemperatureGraph from "./TemperatureGraph";
 import { exportHistoryUrl } from "../api";
 
 export default function DashboardView({ detail, selected, onBack }) {
@@ -75,6 +76,8 @@ export default function DashboardView({ detail, selected, onBack }) {
       </table>
 
       <ShiftChart shiftHistory={detail.shiftHistory} />
+
+      <TemperatureGraph data={detail.temperatureHistory} />
 
       <div className="section-header">
         <h3>Détails par splice</h3>

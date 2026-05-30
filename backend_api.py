@@ -661,6 +661,17 @@ def poste_detail(poste_id: str) -> dict[str, Any]:
         if not df_sim.empty
         else []
     )
+    
+    # Prepare temperature history for graph
+    temperature_history = []
+    if not df_sim.empty and "Temperature" in df_sim.columns:
+        # Take last 30 rows for temperature graph
+        temp_df = df_sim[["Timestamp", "Temperature"]].tail(30).dropna(subset=["Temperature"])
+        for _, row in temp_df.iterrows():
+            temperature_history.append({
+                "timestamp": row["Timestamp"].isoformat(),
+                "temperature": float(row["Temperature"])
+            })
 
     # Calculate shift history per day from start to current sim time, take last 10 days
     shift_history = []
@@ -717,6 +728,7 @@ def poste_detail(poste_id: str) -> dict[str, Any]:
         "shiftHistory": shift_history,
         "temperature": temp_text,
         "temperatureColor": temp_color,
+        "temperatureHistory": temperature_history,
     }
 
 # Serve frontend static files
