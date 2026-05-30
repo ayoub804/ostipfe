@@ -42,7 +42,7 @@ export default function DashboardView({ detail, selected, onBack }) {
         {detail.temperature !== undefined && (
           <div className={`shift-circle temp-${detail.temperatureColor || "gray"}`}>
             <div>Temp</div>
-            <strong>{detail.temperature}</strong>
+            <strong className="temp-value">{detail.temperature}</strong>
           </div>
         )}
         <div className="meta-info">

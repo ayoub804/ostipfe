@@ -25,7 +25,7 @@ ChartJS.register(
 export default function TemperatureGraph({ data }) {
   if (!data || data.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+      <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)', background: 'var(--bg-card)', borderRadius: '16px', margin: '1rem 0', border: '1px solid var(--border)' }}>
         Aucune donnée de température disponible
       </div>
     );
@@ -41,21 +41,23 @@ export default function TemperatureGraph({ data }) {
         label: 'Température (°C)',
         data: data.map((d) => d.temperature),
         borderColor: '#00D1FF',
-        backgroundColor: 'rgba(0, 209, 255, 0.15)',
-        tension: 0.4,
+        backgroundColor: 'rgba(0, 209, 255, 0.2)',
+        tension: 0.35,
         fill: true,
-        pointRadius: 4,
+        pointRadius: 3,
         pointHoverRadius: 6,
         pointBackgroundColor: '#00D1FF',
         pointBorderColor: '#0a0a0a',
         pointBorderWidth: 2,
+        borderWidth: 3,
       },
     ],
   };
 
   const options = {
     responsive: true,
-    maintainAspectRatio: false,
+    maintainAspectRatio: true,
+    aspectRatio: 3,
     plugins: {
       legend: {
         display: false,
@@ -65,16 +67,29 @@ export default function TemperatureGraph({ data }) {
         text: 'Température au fil du temps',
         color: 'var(--text)',
         font: {
-          size: 18,
+          size: 20,
           weight: 'bold',
+          family: 'Orbitron',
         },
+        padding: {
+          top: 10,
+          bottom: 20,
+        }
       },
       tooltip: {
         backgroundColor: 'var(--bg-secondary)',
         titleColor: 'var(--text)',
         bodyColor: 'var(--text-dim)',
-        borderColor: 'var(--border)',
+        borderColor: 'var(--accent-muted)',
         borderWidth: 1,
+        padding: 12,
+        titleFont: {
+          size: 14,
+          family: 'Orbitron',
+        },
+        bodyFont: {
+          size: 14,
+        }
       },
     },
     scales: {
@@ -84,12 +99,18 @@ export default function TemperatureGraph({ data }) {
           display: true,
           text: 'Température (°C)',
           color: 'var(--text-dim)',
+          font: {
+            family: 'Orbitron',
+          }
         },
         ticks: {
           color: 'var(--text-muted)',
+          font: {
+            family: 'Inter',
+          }
         },
         grid: {
-          color: 'var(--border)',
+          color: 'rgba(255, 255, 255, 0.05)',
         },
       },
       x: {
@@ -97,12 +118,18 @@ export default function TemperatureGraph({ data }) {
           display: true,
           text: 'Heure',
           color: 'var(--text-dim)',
+          font: {
+            family: 'Orbitron',
+          }
         },
         ticks: {
           color: 'var(--text-muted)',
+          font: {
+            family: 'Inter',
+          }
         },
         grid: {
-          color: 'var(--border)',
+          color: 'rgba(255, 255, 255, 0.03)',
         },
       },
     },
@@ -112,10 +139,9 @@ export default function TemperatureGraph({ data }) {
     <div style={{
       background: 'var(--bg-card)',
       borderRadius: '16px',
-      padding: '1.5rem',
-      boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
-      margin: '1rem 0',
-      height: '400px',
+      padding: '2rem',
+      boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+      margin: '1.5rem 0',
       border: '1px solid var(--border)',
     }}>
       <Line data={chartData} options={options} />
