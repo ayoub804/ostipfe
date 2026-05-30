@@ -662,12 +662,14 @@ def poste_detail(poste_id: str) -> dict[str, Any]:
         else []
     )
 
-    # Calculate shift history per day from start to current sim time
+    # Calculate shift history per day from start to current sim time, take last 10 days
     shift_history = []
     if not df_sim.empty:
         # Sort days to ensure chronological order
         unique_days = sorted(df_sim["Timestamp"].dt.date.unique())
-        for d in unique_days:
+        # Take last 10 days
+        last_10_days = unique_days[-10:]
+        for d in last_10_days:
             df_day = df_sim[df_sim["Timestamp"].dt.date == d]
             minutes = df_day["Timestamp"].dt.hour * 60 + df_day["Timestamp"].dt.minute
             s1 = int(((minutes >= 360) & (minutes < 870)).sum())
