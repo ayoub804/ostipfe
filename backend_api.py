@@ -680,8 +680,8 @@ def poste_detail(poste_id: str) -> dict[str, Any]:
         # Prepare temperature history for graph
         temperature_history = []
         if not df_sim.empty and temperature_column:
-            # Take last 10 temperature history
-            temp_df = df_sim[["Timestamp", temperature_column]].dropna(subset=[temperature_column]).tail(10)
+            # Take all temperature history
+            temp_df = df_sim[["Timestamp", temperature_column]].dropna(subset=[temperature_column])
             for _, row in temp_df.iterrows():
                 try:
                     temp_val = float(row[temperature_column])
