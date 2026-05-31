@@ -32,7 +32,7 @@ export default function Sidebar({ view, setView, user, setUser, selected, detail
           <ul className="legend">
             <li>🟢 Vert : production active</li>
             <li>🔴 Rouge : erreur signalée</li>
-            <li>⚪ Gris : inactivité (5/20/40 min)</li>
+            <li>⚪ Gris : inactivité ({">"} 15 min)</li>
           </ul>
         </div>
       )}

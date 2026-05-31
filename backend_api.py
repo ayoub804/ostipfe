@@ -57,13 +57,25 @@ def process_excel_data(file_obj: Any) -> pd.DataFrame:
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to read Excel file: {str(e)}")
 
+    # Case-insensitive column renaming and mapping
+    rename_dict = {}
+    for col in df.columns:
+        col_lower = str(col).lower()
+        if col_lower == "date":
+            rename_dict[col] = "Date"
+        elif col_lower == "time":
+            rename_dict[col] = "Time"
+        elif "faut" in col_lower or "err" in col_lower or "fail" in col_lower:
+            rename_dict[col] = "Error-Text"
+        elif "splice" in col_lower:
+            rename_dict[col] = "Splice"
+        elif "temp" in col_lower:
+            rename_dict[col] = "temperature"
+
+    df = df.rename(columns=rename_dict)
+
     if "Date" not in df.columns or "Time" not in df.columns:
-        # Try to guess or use default columns if common names exist
-        if "date" in df.columns: df = df.rename(columns={"date": "Date"})
-        if "time" in df.columns: df = df.rename(columns={"time": "Time"})
-        
-        if "Date" not in df.columns or "Time" not in df.columns:
-            raise HTTPException(status_code=400, detail="Excel file must contain 'Date' and 'Time' columns")
+        raise HTTPException(status_code=400, detail="Excel file must contain 'Date' and 'Time' columns")
 
     df["Date"] = df["Date"].astype(str)
     df["Time"] = df["Time"].astype(str)
@@ -75,6 +87,14 @@ def process_excel_data(file_obj: Any) -> pd.DataFrame:
     if df.empty:
         raise HTTPException(status_code=400, detail="No valid date/time data found in Excel file")
         
+    # Ensure expected columns are present to prevent downstream KeyErrors
+    if "Error-Text" not in df.columns:
+        df["Error-Text"] = None
+    if "Splice" not in df.columns:
+        df["Splice"] = "---"
+    if "temperature" not in df.columns:
+        df["temperature"] = None
+
     return df.sort_values("Timestamp").reset_index(drop=True)
 
 
@@ -111,6 +131,9 @@ def get_temperature_status(temperature: Any) -> tuple[str, str]:
         return "gray", str(temperature) if temperature else "---"
 
 
+IDLE_THRESHOLD_MINUTES = 15
+
+
 def compute_poste_status(poste: "Poste") -> tuple[str, str, pd.DataFrame, dict[str, Any] | None, pd.Timestamp]:
     color = "green"
     status = "Machine en Production"
@@ -132,28 +155,22 @@ def compute_poste_status(poste: "Poste") -> tuple[str, str, pd.DataFrame, dict[s
         # Ensure last_activity is naive if sim_time is naive for duration calculation
         if sim_time.tz is None and last_activity.tz is not None:
             last_activity = last_activity.tz_localize(None)
-        
+
         has_error = pd.notna(last_row.get("Error-Text")) and str(last_row.get("Error-Text")).strip() != ""
         if has_error:
             color = "red"
             status = f"ERREUR : {last_row.get('Error-Text')}"
+        else:
+            idle_duration = (sim_time - last_activity).total_seconds() / 60
+            if idle_duration >= IDLE_THRESHOLD_MINUTES:
+                color = "gray"
+                status = f"Machine en Repos (> {IDLE_THRESHOLD_MINUTES} min)"
     else:
         last_activity = poste.last_activity_time
         if sim_time.tz is None and last_activity.tz is not None:
             last_activity = last_activity.tz_localize(None)
         color = "gray"
-        status = "Machine en Repos (> 5 min)"
-
-    idle_duration = (sim_time - last_activity).total_seconds() / 60
-    if idle_duration >= 40:
-        color = "gray"
-        status = "La machine cessé de fonctionelle"
-    elif idle_duration >= 20:
-        color = "gray"
-        status = "L'employeur est perdue"
-    elif idle_duration > 5 and color == "green":
-        color = "gray"
-        status = "Machine en Repos (> 5 min)"
+        status = f"Machine en Repos (> {IDLE_THRESHOLD_MINUTES} min)"
 
     return color, status, df_sim, last_row, last_activity
 

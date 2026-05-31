@@ -438,6 +438,9 @@ def get_time_jump_delta(poste):
     return pd.Timedelta(hours=poste['time_jump_value'])
 
 
+IDLE_THRESHOLD_MINUTES = 15
+
+
 def compute_poste_status(poste):
     color_class = "bg-green"
     status_msg = "Machine en Production"
@@ -453,21 +456,15 @@ def compute_poste_status(poste):
         if has_error:
             color_class = "bg-red"
             status_msg = f"ERREUR : {last_row['Error-Text']}"
+        else:
+            idle_duration = (sim_time - last_activity).total_seconds() / 60
+            if idle_duration >= IDLE_THRESHOLD_MINUTES:
+                color_class = "bg-gray"
+                status_msg = f"Machine en Repos (> {IDLE_THRESHOLD_MINUTES} min)"
     else:
         last_activity = poste.get('last_activity_time', sim_time)
         color_class = "bg-gray"
-        status_msg = "Machine en Repos (> 5 min)"
-
-    idle_duration = (sim_time - last_activity).total_seconds() / 60
-    if idle_duration >= 40:
-        color_class = "bg-gray"
-        status_msg = "La machine cessé de fonctionelle"
-    elif idle_duration >= 20:
-        color_class = "bg-gray"
-        status_msg = "L'employeur est perdue"
-    elif idle_duration > 5 and color_class == "bg-green":
-        color_class = "bg-gray"
-        status_msg = "Machine en Repos (> 5 min)"
+        status_msg = f"Machine en Repos (> {IDLE_THRESHOLD_MINUTES} min)"
 
     return color_class, status_msg, df_sim, last_row, last_activity
 
@@ -492,7 +489,7 @@ def render_home():
 
 - Machine active sans erreur.
 
-- Délai d'activité < 5 minutes.
+- Dernière activité il y a moins de 15 minutes.
 
 
 
@@ -504,11 +501,7 @@ def render_home():
 
 ⚪ **Gris (Inactivité)**
 
-- Repos : Inactif depuis plus de 5 minutes.
-
-- Perte : Inactif depuis plus de 20 minutes (L'employeur est perdu).
-
-- Arrêt : Inactif depuis plus de 40 minutes (La machine a cessé de fonctionner).
+- Inactif depuis 15 minutes ou plus (sans erreur en cours).
 
 """)
 
@@ -779,7 +772,7 @@ def render_dashboard():
 
 - Machine active sans erreur.
 
-- Délai d'activité < 5 minutes.
+- Dernière activité il y a moins de 15 minutes.
 
 
 
@@ -791,11 +784,7 @@ def render_dashboard():
 
 ⚪ **Gris (Inactivité)**
 
-- Repos : Inactif depuis plus de 5 minutes.
-
-- Perte : Inactif depuis plus de 20 minutes (L'employeur est perdu).
-
-- Arrêt : Inactif depuis plus de 40 minutes (La machine a cessé de fonctionner).
+- Inactif depuis 15 minutes ou plus (sans erreur en cours).
 
 """)
 
