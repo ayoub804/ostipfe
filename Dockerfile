@@ -15,4 +15,4 @@ COPY . .
 # Copy built frontend from build stage
 COPY --from=build-stage /app/frontend/dist /app/frontend/dist
 EXPOSE 10000
-CMD ["gunicorn", "-b", "0.0.0.0:10000", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "backend_api:app"]
+CMD ["gunicorn", "-b", "0.0.0.0:10000", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "backend_api:app"]

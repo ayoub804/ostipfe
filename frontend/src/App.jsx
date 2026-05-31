@@ -42,6 +42,8 @@ export default function App() {
   const [postes, setPostes] = useState([]);
   const [selectedPosteId, setSelectedPosteId] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [globalTime, setGlobalTime] = useState("");
 
@@ -61,13 +63,27 @@ export default function App() {
   const refreshPostes = async () => setPostes(await fetchPostes());
   const refreshAlerts = async () => setAlerts(await fetchAlerts());
   const refreshDetail = async (id) => {
-    const data = await fetchPosteDetail(id);
-    setDetail(data);
-    return data;
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
+      const data = await fetchPosteDetail(id);
+      setDetail(data);
+      return data;
+    } catch (err) {
+      setDetail(null);
+      setDetailError(err.message || "Impossible de charger ce poste");
+      return null;
+    } finally {
+      setDetailLoading(false);
+    }
   };
 
   const handleRefreshAll = async () => {
-    await tickAll();
+    try {
+      await tickAll();
+    } catch {
+      // Keep UI responsive even if tick fails
+    }
     await refreshPostes();
     if (selectedPosteId) await refreshDetail(selectedPosteId);
     if (view === "maintenance") await refreshAlerts();
@@ -88,11 +104,27 @@ export default function App() {
 
   const handleSelectPoste = async (id) => {
     setSelectedPosteId(id);
+    setDetail(null);
+    setDetailError(null);
     setFilterStart("");
     setFilterEnd("");
     setJumpTime("");
     await refreshDetail(id);
   };
+
+  const handleBackToOverview = () => {
+    setSelectedPosteId(null);
+    setDetail(null);
+    setDetailError(null);
+    setDetailLoading(false);
+  };
+
+  const selectedPoste = postes.find((p) => p.id === selectedPosteId);
+  const detailTitle = selectedPosteId
+    ? (detail?.name || selectedPoste?.name || "Poste")
+    : view === "monitoring"
+      ? "Monitoring Overview"
+      : "Maintenance Alerts";
 
   return (
     <div className="main-wrapper">
@@ -131,14 +163,16 @@ export default function App() {
                 globalTime={globalTime} 
                 setGlobalTime={setGlobalTime} 
                 onRefresh={handleRefreshAll} 
-                title={selectedPosteId ? `Poste ${selectedPosteId}` : view === "monitoring" ? "Monitoring Overview" : "Maintenance Alerts"}
+                title={detailTitle}
               />
               <div className="content-inner">
                 {selectedPosteId ? (
                   <DashboardView 
-                    detail={detail} 
+                    detail={detail}
+                    loading={detailLoading}
+                    error={detailError}
                     selected={selectedPosteId} 
-                    onBack={() => { setSelectedPosteId(null); setDetail(null); }} 
+                    onBack={handleBackToOverview}
                   />
                 ) : (
                   view === "monitoring" ? (

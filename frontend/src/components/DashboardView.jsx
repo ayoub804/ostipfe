@@ -4,7 +4,7 @@ import ShiftChart from "./ShiftChart";
 import TemperatureGraph from "./TemperatureGraph";
 import { exportHistoryUrl } from "../api";
 
-export default function DashboardView({ detail, selected, onBack }) {
+export default function DashboardView({ detail, loading, error, selected, onBack }) {
   const [spliceSearch, setSpliceSearch] = useState("");
   const [exportStart, setExportStart] = useState("");
   const [exportEnd, setExportEnd] = useState("");
@@ -19,7 +19,21 @@ export default function DashboardView({ detail, selected, onBack }) {
     ];
   }, [detail]);
 
-  if (!detail) return null;
+  if (!detail) {
+    return (
+      <div>
+        <button className="btn btn-ghost" onClick={onBack} style={{ marginBottom: 16 }}>← Retour à l'accueil</button>
+        {loading ? (
+          <p style={{ color: "var(--text-dim)" }}>Chargement du poste...</p>
+        ) : (
+          <div style={{ color: "var(--text-dim)" }}>
+            <p>{error || "Impossible de charger ce poste."}</p>
+            <p style={{ marginTop: 8, fontSize: 13 }}>Le serveur a peut-être redémarré. Revenez à la liste et rouvrez le poste.</p>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   function downloadHistory() {
     if (!exportStart || !exportEnd) { alert("Veuillez sélectionner une plage de dates."); return; }
