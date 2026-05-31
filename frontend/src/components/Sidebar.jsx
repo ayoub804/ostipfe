@@ -30,10 +30,11 @@ export default function Sidebar({ view, setView, user, setUser, selected, detail
         <div>
           <h3>Couleurs des machines</h3>
           <ul className="legend">
-            <li>🟢 Vert : production active</li>
-            <li>🔴 Rouge : erreur signalée</li>
-            <li>⚪ Gris : inactivité ({">"} 15 min)</li>
+            <li>🟢 Vert : production active (ou défaut qualité)</li>
+            <li>🔴 Rouge : arrêt machine / erreur signalée</li>
+            <li>⚪ Gris : inactivité (&gt;= 15 min)</li>
           </ul>
+
         </div>
       )}
 

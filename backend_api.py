@@ -51,45 +51,68 @@ def send_admin_email(subject: str, body: str):
     send_notification_emails([ADMIN_EMAIL], subject, body)
 
 
+def normalize_excel_columns(df: pd.DataFrame) -> pd.DataFrame:
+    rename_dict = {}
+    for col in df.columns:
+        col_lower = str(col).lower().strip()
+        if col_lower == "date":
+            rename_dict[col] = "Date"
+        elif col_lower == "time":
+            rename_dict[col] = "Time"
+        elif col_lower in ("error-text", "errortext", "error text"):
+            rename_dict[col] = "Error-Text"
+        elif col_lower == "error":
+            rename_dict[col] = "Error-Code"
+        elif "splice" in col_lower:
+            rename_dict[col] = "Splice"
+        elif col_lower == "temperature" or col_lower.startswith("temp"):
+            rename_dict[col] = "temperature"
+        elif col_lower in ("no.", "no"):
+            rename_dict[col] = "No"
+        elif col_lower == "sequence":
+            rename_dict[col] = "Sequence"
+    return df.rename(columns=rename_dict)
+
+
+def parse_excel_timestamps(df: pd.DataFrame) -> pd.Series:
+    date_str = df["Date"].astype(str).str.strip()
+    time_str = df["Time"].astype(str).str.strip()
+    combined = date_str + " " + time_str
+    ts = pd.to_datetime(combined, errors="coerce", dayfirst=True)
+    missing = ts.isna()
+    if missing.any():
+        try:
+            ts.loc[missing] = pd.to_datetime(combined[missing], errors="coerce", format="mixed")
+        except (TypeError, ValueError):
+            ts.loc[missing] = pd.to_datetime(combined[missing], errors="coerce")
+    return ts
+
+
 def process_excel_data(file_obj: Any) -> pd.DataFrame:
     try:
         df = pd.read_excel(file_obj)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to read Excel file: {str(e)}")
 
-    # Case-insensitive column renaming and mapping
-    rename_dict = {}
-    for col in df.columns:
-        col_lower = str(col).lower()
-        if col_lower == "date":
-            rename_dict[col] = "Date"
-        elif col_lower == "time":
-            rename_dict[col] = "Time"
-        elif "faut" in col_lower or "err" in col_lower or "fail" in col_lower:
-            rename_dict[col] = "Error-Text"
-        elif "splice" in col_lower:
-            rename_dict[col] = "Splice"
-        elif "temp" in col_lower:
-            rename_dict[col] = "temperature"
-
-    df = df.rename(columns=rename_dict)
+    df = normalize_excel_columns(df)
 
     if "Date" not in df.columns or "Time" not in df.columns:
         raise HTTPException(status_code=400, detail="Excel file must contain 'Date' and 'Time' columns")
 
-    df["Date"] = df["Date"].astype(str)
-    df["Time"] = df["Time"].astype(str)
-    df["Timestamp"] = pd.to_datetime(df["Date"] + " " + df["Time"], errors="coerce")
-    
+    df["Timestamp"] = parse_excel_timestamps(df)
+
     # Drop rows where timestamp couldn't be parsed
     df = df.dropna(subset=["Timestamp"])
-    
+
     if df.empty:
         raise HTTPException(status_code=400, detail="No valid date/time data found in Excel file")
-        
-    # Ensure expected columns are present to prevent downstream KeyErrors
+
     if "Error-Text" not in df.columns:
         df["Error-Text"] = None
+    else:
+        df["Error-Text"] = df["Error-Text"].apply(
+            lambda v: str(v).strip() if pd.notna(v) and str(v).strip() != "" else None
+        )
     if "Splice" not in df.columns:
         df["Splice"] = "---"
     if "temperature" not in df.columns:
@@ -134,7 +157,42 @@ def get_temperature_status(temperature: Any) -> tuple[str, str]:
 IDLE_THRESHOLD_MINUTES = 15
 
 
+def get_error_text(row: dict[str, Any] | None) -> str:
+    if not row:
+        return ""
+    val = row.get("Error-Text")
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return ""
+    return str(val).strip()
+
+
+def is_critical_error(error_text: str) -> bool:
+    """Red for machine stops. DEFAUT is quality-only and stays green when active."""
+    text = str(error_text).strip() if error_text else ""
+    if not text:
+        return False
+    upper = text.upper()
+    if "DEFAUT" in upper or "DEFAULT" in upper:
+        return False
+    return True
+
+
 def compute_poste_status(poste: "Poste") -> tuple[str, str, pd.DataFrame, dict[str, Any] | None, pd.Timestamp]:
+    """Determine machine status color and message.
+
+    This file is an error-only log: rows only appear when something happens
+    (quality defects, machine errors, etc.).  Between events the machine is
+    producing normally, so the *absence* of events means GREEN.
+
+    Rules
+    -----
+    - **GREEN** – default.  Also stays green for DEFAUT lines (quality defects,
+      not machine stops).
+    - **RED**   – the most recent event visible at the current sim-time is a
+      *critical* error and no subsequent non-critical event has appeared yet.
+    - **GRAY**  – simulation time has gone past *all* data in the dataset,
+      or the machine has been inactive (no data recorded) for 15 minutes or more.
+    """
     color = "green"
     status = "Machine en Production"
 
@@ -152,25 +210,49 @@ def compute_poste_status(poste: "Poste") -> tuple[str, str, pd.DataFrame, dict[s
 
     if last_row:
         last_activity = pd.Timestamp(last_row["Timestamp"])
-        # Ensure last_activity is naive if sim_time is naive for duration calculation
-        if sim_time.tz is None and last_activity.tz is not None:
+        # Ensure last_activity matching timezone with sim_time
+        if sim_time.tz is not None and last_activity.tz is None:
+            last_activity = last_activity.tz_localize(sim_time.tz)
+        elif sim_time.tz is None and last_activity.tz is not None:
             last_activity = last_activity.tz_localize(None)
 
-        has_error = pd.notna(last_row.get("Error-Text")) and str(last_row.get("Error-Text")).strip() != ""
-        if has_error:
+        error_text = get_error_text(last_row)
+        if is_critical_error(error_text):
+            # Last visible event is itself a critical error → RED
             color = "red"
-            status = f"ERREUR : {last_row.get('Error-Text')}"
+            status = error_text
         else:
-            idle_duration = (sim_time - last_activity).total_seconds() / 60
-            if idle_duration >= IDLE_THRESHOLD_MINUTES:
-                color = "gray"
-                status = f"Machine en Repos (> {IDLE_THRESHOLD_MINUTES} min)"
+            # Last event is non-critical (DEFAUT or empty) → machine is OK.
+            color = "green"
+            if error_text:
+                # DEFAUT line – show as info but keep green
+                status = error_text
+            else:
+                status = "Machine en Production"
+
+        # Check for 15 min inactivity
+        elapsed_minutes = (sim_time - last_activity).total_seconds() / 60.0
+        if elapsed_minutes >= 15.0:
+            color = "gray"
+            status = "Inactif"
+
+        # -- GRAY: only when sim time is past the very last event in the
+        #    entire dataset (simulation finished, no more data).
+        max_ts = poste.data["Timestamp"].max()
+        if sim_time.tz is None and max_ts.tz is not None:
+            max_ts = max_ts.tz_localize(None)
+        elif sim_time.tz is not None and max_ts.tz is None:
+            max_ts = max_ts.tz_localize(sim_time.tz)
+        if sim_time > max_ts:
+            color = "gray"
+            status = "Simulation terminée — pas de données"
     else:
+        # No rows yet (sim time is before the first event)
         last_activity = poste.last_activity_time
         if sim_time.tz is None and last_activity.tz is not None:
             last_activity = last_activity.tz_localize(None)
         color = "gray"
-        status = f"Machine en Repos (> {IDLE_THRESHOLD_MINUTES} min)"
+        status = "En attente de données"
 
     return color, status, df_sim, last_row, last_activity
 
@@ -495,8 +577,8 @@ def tick_all() -> dict[str, bool]:
             if color == "red" and last_row and not df_sim.empty:
                 error_rows = []
                 for _, row in df_sim[::-1].iterrows():
-                    row_has_error = pd.notna(row.get("Error-Text")) and str(row.get("Error-Text")).strip() != ""
-                    if row_has_error:
+                    row_text = get_error_text(row.to_dict())
+                    if is_critical_error(row_text):
                         error_rows.append(row)
                     else:
                         break

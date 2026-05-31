@@ -311,31 +311,75 @@ if 'updating_poste_idx' not in st.session_state:
 
 # 3. Fonction pour traiter les données Excel
 
+def normalize_excel_columns(df):
+    rename_dict = {}
+    for col in df.columns:
+        col_lower = str(col).lower().strip()
+        if col_lower == "date":
+            rename_dict[col] = "Date"
+        elif col_lower == "time":
+            rename_dict[col] = "Time"
+        elif col_lower in ("error-text", "errortext", "error text"):
+            rename_dict[col] = "Error-Text"
+        elif col_lower == "error":
+            rename_dict[col] = "Error-Code"
+        elif "splice" in col_lower:
+            rename_dict[col] = "Splice"
+        elif col_lower == "temperature" or col_lower.startswith("temp"):
+            rename_dict[col] = "temperature"
+        elif col_lower in ("no.", "no"):
+            rename_dict[col] = "No"
+        elif col_lower == "sequence":
+            rename_dict[col] = "Sequence"
+    return df.rename(columns=rename_dict)
+
+
+def parse_excel_timestamps(df):
+    date_str = df["Date"].astype(str).str.strip()
+    time_str = df["Time"].astype(str).str.strip()
+    combined = date_str + " " + time_str
+    ts = pd.to_datetime(combined, errors="coerce", dayfirst=True)
+    missing = ts.isna()
+    if missing.any():
+        try:
+            ts.loc[missing] = pd.to_datetime(combined[missing], errors="coerce", format="mixed")
+        except (TypeError, ValueError):
+            ts.loc[missing] = pd.to_datetime(combined[missing], errors="coerce")
+    return ts
+
+
 def process_excel_data(file):
 
     try:
 
         df = pd.read_excel(file)
 
-        # Nettoyage simple
+        df = normalize_excel_columns(df)
 
-        df['Date'] = df['Date'].astype(str)
+        if "Date" not in df.columns or "Time" not in df.columns:
+            st.error("Le fichier Excel doit contenir les colonnes Date et Time.")
+            return None
 
-        df['Time'] = df['Time'].astype(str)
+        df["Timestamp"] = parse_excel_timestamps(df)
 
-        df['Timestamp'] = pd.to_datetime(df['Date'] + ' ' + df['Time'], errors='coerce')
+        df = df.dropna(subset=["Timestamp"])
 
-       
+        if df.empty:
+            st.error("Aucune date/heure valide trouvée dans le fichier Excel.")
+            return None
 
-        # Ken fama ligne mafihch date, na3tiwah 15/12/2025 kima fel code original
+        if "Error-Text" not in df.columns:
+            df["Error-Text"] = None
+        else:
+            df["Error-Text"] = df["Error-Text"].apply(
+                lambda v: str(v).strip() if pd.notna(v) and str(v).strip() != "" else None
+            )
+        if "Splice" not in df.columns:
+            df["Splice"] = "---"
+        if "temperature" not in df.columns:
+            df["temperature"] = None
 
-        df['Timestamp'] = df['Timestamp'].fillna(pd.Timestamp('2025-12-15 08:00:00'))
-
-       
-
-        # Sort by timestamp to ensure correct simulation
-
-        df = df.sort_values('Timestamp').reset_index(drop=True)
+        df = df.sort_values("Timestamp").reset_index(drop=True)
 
         return df
 
@@ -441,7 +485,33 @@ def get_time_jump_delta(poste):
 IDLE_THRESHOLD_MINUTES = 15
 
 
+def get_error_text(row) -> str:
+    if row is None:
+        return ""
+    val = row.get("Error-Text") if hasattr(row, "get") else row["Error-Text"]
+    if pd.isna(val):
+        return ""
+    return str(val).strip()
+
+
+def is_critical_error(error_text: str) -> bool:
+    text = str(error_text).strip() if error_text else ""
+    if not text:
+        return False
+    upper = text.upper()
+    if "DEFAUT" in upper or "DEFAULT" in upper:
+        return False
+    return True
+
+
 def compute_poste_status(poste):
+    """Determine machine status color and message.
+
+    Rules:
+      GREEN – default. Also for DEFAUT lines (quality defects, not stops).
+      RED   – last visible event is a critical error (non-DEFAUT error)
+      GRAY  – sim time past ALL data (simulation finished), or inactive for 15 minutes or more.
+    """
     color_class = "bg-green"
     status_msg = "Machine en Production"
 
@@ -452,19 +522,42 @@ def compute_poste_status(poste):
 
     if last_row is not None:
         last_activity = last_row['Timestamp']
-        has_error = pd.notna(last_row['Error-Text']) and str(last_row['Error-Text']).strip() != ""
-        if has_error:
+        # Ensure last_activity matching timezone with sim_time
+        if hasattr(sim_time, "tz") and sim_time.tz is not None and last_activity.tz is None:
+            last_activity = last_activity.tz_localize(sim_time.tz)
+        elif (not hasattr(sim_time, "tz") or sim_time.tz is None) and last_activity.tz is not None:
+            last_activity = last_activity.tz_localize(None)
+
+        error_text = get_error_text(last_row)
+        if is_critical_error(error_text):
+            # Last visible event is a critical error → RED
             color_class = "bg-red"
-            status_msg = f"ERREUR : {last_row['Error-Text']}"
+            status_msg = error_text
         else:
-            idle_duration = (sim_time - last_activity).total_seconds() / 60
-            if idle_duration >= IDLE_THRESHOLD_MINUTES:
-                color_class = "bg-gray"
-                status_msg = f"Machine en Repos (> {IDLE_THRESHOLD_MINUTES} min)"
+            # Non-critical (DEFAUT or empty) → machine OK → GREEN
+            color_class = "bg-green"
+            if error_text:
+                # DEFAUT line – show as info but keep green
+                status_msg = error_text
+            else:
+                status_msg = "Machine en Production"
+
+        # Check for 15 min inactivity
+        elapsed_minutes = (sim_time - last_activity).total_seconds() / 60.0
+        if elapsed_minutes >= 15.0:
+            color_class = "bg-gray"
+            status_msg = "Inactif"
+
+        # GRAY: only when sim time is past ALL data in the dataset
+        max_ts = df_full['Timestamp'].max()
+        if sim_time > max_ts:
+            color_class = "bg-gray"
+            status_msg = "Simulation terminée — pas de données"
     else:
+        # No rows yet (sim time is before the first event)
         last_activity = poste.get('last_activity_time', sim_time)
         color_class = "bg-gray"
-        status_msg = f"Machine en Repos (> {IDLE_THRESHOLD_MINUTES} min)"
+        status_msg = "En attente de données"
 
     return color_class, status_msg, df_sim, last_row, last_activity
 
@@ -487,21 +580,21 @@ def render_home():
 
 🟢 **Vert (Production)**
 
-- Machine active sans erreur.
+- Machine active sans erreur (ou événement de type DEFAUT).
 
 - Dernière activité il y a moins de 15 minutes.
 
 
 
-🔴 **Rouge (Erreur)**
+🔴 **Rouge (Arrêt machine)**
 
-- Une erreur est signalée dans le fichier Excel (Error-Text).
+- Tout autre message d'erreur.
 
 
 
 ⚪ **Gris (Inactivité)**
 
-- Inactif depuis 15 minutes ou plus (sans erreur en cours).
+- Inactif depuis 15 minutes ou plus.
 
 """)
 
@@ -776,15 +869,17 @@ def render_dashboard():
 
 
 
-🔴 **Rouge (Erreur)**
+🔴 **Rouge (Arrêt machine)**
 
-- Une erreur est signalée dans le fichier Excel (Error-Text).
+- **ERREUR**, **AVORTER**, erreur PLC, échec d'initialisation.
 
 
 
 ⚪ **Gris (Inactivité)**
 
 - Inactif depuis 15 minutes ou plus (sans erreur en cours).
+
+**Note :** une ligne **DEFAUT** (défaut qualité) n'est pas une erreur machine — la carte reste verte si la production est active.
 
 """)
 
